@@ -45,12 +45,12 @@ class Wuerfel:
         self.wert = 6
         self.x = WIDTH // 2
         self.y = HEIGHT // 2
+        self.ist_am_rollen = False  # Speichert, ob die Animation gerade läuft
         
     def rollen(self):
         self.wert = random.randint(1, 6)
         
     def zeichnen(self):
-        # Zeichnet ein einfaches weißes Quadrat mit schwarzem Text als Würfel
         rect = Rect((self.x - 20, self.y - 20), (40, 40))
         screen.draw.filled_rect(rect, FARBEN["WEISS"])
         screen.draw.rect(rect, FARBEN["SCHWARZ"])
@@ -106,7 +106,7 @@ class Spiel:
         self.aktueller_spieler_idx = (self.aktueller_spieler_idx + 1) % 4
         self.gewuerfelt = False
         
-        # NEU: Überprüfen, wie oft der neue Spieler würfeln darf
+        # Überprüfen, wie oft der neue Spieler würfeln darf
         if self.alle_figuren_im_start():
             self.wuerfe_uebrig = 3
         else:
@@ -201,27 +201,42 @@ def draw():
         for figur in spieler.figuren:
             figur.zeichnen()
 
+def wuerfel_tick():
+    # Wird während der Animation immer wieder aufgerufen und zeigt zufällige Zahlen
+    mein_spiel.wuerfel.rollen()
+
+def wuerfel_stop():
+    # Stoppt das schnelle Wechseln
+    clock.unschedule(wuerfel_tick)
+    mein_spiel.wuerfel.ist_am_rollen = False
+    
+    # --- HIER passiert nun die eigentliche Spiellogik, die vorher im Klick war ---
+    mein_spiel.wuerfe_uebrig -= 1
+    
+    if mein_spiel.zug_moeglich():
+        mein_spiel.gewuerfelt = True # Ein Zug MUSS gemacht werden
+    else:
+        # Kein Zug möglich
+        if mein_spiel.wuerfe_uebrig > 0:
+            pass # Man darf nochmal klicken
+        else:
+            mein_spiel.gewuerfelt = True # Blockiert weiteres Klicken
+            clock.schedule_unique(mein_spiel.naechster_spieler, 1.0)
+
 def on_mouse_down(pos):
     # 1. Prüfen, ob der Würfel geklickt wurde
     wx, wy = mein_spiel.wuerfel.x, mein_spiel.wuerfel.y
     if abs(pos[0] - wx) < 20 and abs(pos[1] - wy) < 20:
-        if not mein_spiel.gewuerfelt:
-            mein_spiel.wuerfel.rollen()
-            mein_spiel.wuerfe_uebrig -= 1 # Einen Versuch abziehen
+        
+        # Nur reagieren, wenn man würfeln darf UND der Würfel nicht schon rollt
+        if not mein_spiel.gewuerfelt and not mein_spiel.wuerfel.ist_am_rollen:
+            mein_spiel.wuerfel.ist_am_rollen = True
             
-            # Prüfen, ob ein Zug möglich ist (z.B. bei einer 6)
-            if mein_spiel.zug_moeglich():
-                mein_spiel.gewuerfelt = True # Es muss eine Figur gezogen werden!
-            else:
-                # Kein Zug möglich mit diesem Wurf
-                if mein_spiel.wuerfe_uebrig > 0:
-                    # Man darf nochmal würfeln (gewuerfelt bleibt False)
-                    pass 
-                else:
-                    # Keine Würfe mehr übrig -> Nächster Spieler
-                    mein_spiel.gewuerfelt = True # Blockiert weiteres Würfeln
-                    clock.schedule_unique(mein_spiel.naechster_spieler, 1.0)
-            return
+            # Starte die Animation: Ändere die Zahl alle 0.05 Sekunden
+            clock.schedule_interval(wuerfel_tick, 0.05)
+            # Beende die Animation nach 0.5 Sekunden
+            clock.schedule_unique(wuerfel_stop, 0.5)
+        return
 
     # 2. Prüfen, ob eine eigene Spielfigur geklickt wurde
     if mein_spiel.gewuerfelt:
