@@ -207,8 +207,8 @@ def draw():
     screen.draw.text(f"Am Zug: {aktuelle_farbe}", topleft=(10, 610), color=FARBEN[aktuelle_farbe], fontsize=30)
     
     if not mein_spiel.gewuerfelt:
-            text = f"Würfeln! (Versuche: {mein_spiel.wuerfe_uebrig})"
-            screen.draw.text(text, topright=(WIDTH-10, 610), color=FARBEN["SCHWARZ"], fontsize=25)
+        text = f"Würfeln! (Versuche: {mein_spiel.wuerfe_uebrig})"
+        screen.draw.text(text, topright=(WIDTH-10, 610), color=FARBEN["SCHWARZ"], fontsize=25)
     
     # Zeichne Lauffelder (als leere Kreise)
     for fx, fy in LAUFFELDER:
