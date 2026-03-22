@@ -127,16 +127,6 @@ class Spiel:
             self.wuerfe_uebrig = 3
         else:
             self.wuerfe_uebrig = 1
-
-    def zug_moeglich(self):
-        # (Deine zuvor hinzugefügte Methode bleibt hier genau gleich)
-        aktueller_spieler = self.get_aktueller_spieler()
-        for figur in aktueller_spieler.figuren:
-            if figur.status == "LAUFFELD":
-                return True
-            if figur.status == "START" and self.wuerfel.wert == 6:
-                return True
-        return False
         
     def figur_bewegen(self, figur):
         if figur.status == "START" and self.wuerfel.wert == 6:
