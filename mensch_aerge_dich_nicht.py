@@ -15,7 +15,8 @@ FARBEN = {
     "GELB": (220, 220, 50),
     "GRUEN": (50, 220, 50),
     "WEISS": (255, 255, 255),
-    "SCHWARZ": (0, 0, 0)
+    "SCHWARZ": (0, 0, 0),
+    "ORANGE": (255, 165, 0)
 }
 
 # Koordinaten der 40 Lauffelder im 11x11 Raster
@@ -77,18 +78,23 @@ class Spielfigur:
         self.schritte = 0 
         self.ziel_position = -1 # Index 0 bis 3 im Häuschen
         
-    def zeichnen(self):
+    def zeichnen(self, highlight=False):
         if self.status == "START":
             px = self.start_x * CELL_SIZE + OFFSET
             py = self.start_y * CELL_SIZE + OFFSET
         elif self.status == "LAUFFELD":
             px = LAUFFELDER[self.position][0] * CELL_SIZE + OFFSET
             py = LAUFFELDER[self.position][1] * CELL_SIZE + OFFSET
-        elif self.status == "ZIEL": # Zeichnen im Häuschen
+        elif self.status == "ZIEL": 
             zx, zy = ZIEL_FELDER[self.farbe][self.ziel_position]
             px = zx * CELL_SIZE + OFFSET
             py = zy * CELL_SIZE + OFFSET
             
+        # Wenn highlight=True, zeichne einen oragenen "Heiligenschein"
+        if highlight:
+            screen.draw.filled_circle((px, py), 19, FARBEN["ORANGE"])
+            
+        # Die normale Figur zeichnen
         screen.draw.filled_circle((px, py), 15, FARBEN[self.farbe])
         screen.draw.circle((px, py), 15, FARBEN["SCHWARZ"])
 
@@ -229,6 +235,43 @@ class Spiel:
                     if not any(f.status == "ZIEL" and f.ziel_position == haus_index for f in aktueller_spieler.figuren):
                         return True
         return False
+    
+    def kann_figur_bewegen(self, figur):
+        aktueller_spieler = self.get_aktueller_spieler()
+        
+        # 1. Gehört die Figur überhaupt dem aktuellen Spieler?
+        if figur not in aktueller_spieler.figuren:
+            return False
+
+        # 2. Zwangszüge bei einer 6 prüfen
+        if self.wuerfel.wert == 6:
+            hat_start_figuren = any(f.status == "START" for f in aktueller_spieler.figuren)
+            start_idx = START_INDEX[aktueller_spieler.farbe]
+            start_blockiert = any(f.status == "LAUFFELD" and f.position == start_idx for f in aktueller_spieler.figuren)
+            
+            if hat_start_figuren and not start_blockiert:
+                return figur.status == "START" # Zwang: Nur Startfiguren dürfen bewegt werden
+                
+            if start_blockiert:
+                return figur.status == "LAUFFELD" and figur.position == start_idx # Zwang: Startfeld räumen
+                
+        # 3. Normale Züge
+        if figur.status == "START":
+            return self.wuerfel.wert == 6 
+            
+        elif figur.status == "LAUFFELD" or figur.status == "ZIEL":
+            neue_schritte = figur.schritte + self.wuerfel.wert
+            if neue_schritte < 40:
+                return True # Zug auf dem Lauffeld ist erlaubt
+            elif neue_schritte < 44:
+                haus_index = neue_schritte - 40
+                # Prüfen, ob das angepeilte Zielfeld frei ist
+                for f in aktueller_spieler.figuren:
+                    if f.status == "ZIEL" and f.ziel_position == haus_index:
+                        return False # Besetzt!
+                return True
+                
+        return False
 
 
 # --- HAUPTPROGRAMM (PYGAME ZERO) ---
@@ -268,7 +311,16 @@ def draw():
     # Zeichne alle Figuren
     for spieler in mein_spiel.spieler_liste:
         for figur in spieler.figuren:
-            figur.zeichnen()
+            
+            # Prüfen, ob die Figur gehighlighted werden soll
+            soll_highlighten = False
+            
+            # Nur highlighten, wenn gewürfelt wurde UND die Animation fertig ist
+            if mein_spiel.gewuerfelt and not mein_spiel.wuerfel.ist_am_rollen:
+                if mein_spiel.kann_figur_bewegen(figur):
+                    soll_highlighten = True
+                    
+            figur.zeichnen(highlight=soll_highlighten)
 
 def wuerfel_tick():
     # Wird während der Animation immer wieder aufgerufen und zeigt zufällige Zahlen
