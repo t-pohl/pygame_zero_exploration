@@ -129,6 +129,30 @@ class Spiel:
             self.wuerfe_uebrig = 1
         
     def figur_bewegen(self, figur):
+        aktueller_spieler = self.get_aktueller_spieler()
+        
+        # ZWANGSZÜGE BEI EINER 6 ÜBERPRÜFEN ---
+        if self.wuerfel.wert == 6:
+            # Prüfen, ob es Figuren im Start gibt
+            hat_start_figuren = any(f.status == "START" for f in aktueller_spieler.figuren)
+            
+            # Prüfen, ob das eigene Startfeld durch eine eigene Figur blockiert ist
+            start_idx = START_INDEX[aktueller_spieler.farbe]
+            start_blockiert = any(f.status == "LAUFFELD" and f.position == start_idx for f in aktueller_spieler.figuren)
+            
+            # Zwang 1: Herausziehen! (Wenn Figuren im Start sind und das Startfeld frei ist)
+            if hat_start_figuren and not start_blockiert and figur.status != "START":
+                print("Zwangszug: Du musst eine Figur aus dem Haus ziehen!")
+                return # Bricht die Funktion ab, der Spieler muss eine andere Figur anklicken
+                
+            # Zwang 2: Startfeld räumen! (Wenn eine eigene Figur den Start blockiert)
+            # In diesem Fall MUSS die Figur bewegt werden, die auf dem Startfeld steht.
+            if start_blockiert and figur.position != start_idx and figur.status != "START":
+                print("Zwangszug: Du musst zuerst dein Startfeld räumen!")
+                return # Bricht die Funktion ab
+        # ----------------------------------------------
+
+        # --- Die eigentliche Bewegungslogik ---
         if figur.status == "START" and self.wuerfel.wert == 6:
             figur.status = "LAUFFELD"
             figur.schritte = 0 # Schritte auf 0 setzen
@@ -137,7 +161,7 @@ class Spiel:
             
             # Bei einer 6 darf man nochmal!
             self.gewuerfelt = False 
-            self.wuerfe_uebrig = 1  # Anzeige der Versuche für den nächsten Wurf aktualisieren
+            self.wuerfe_uebrig = 1
             
         elif figur.status == "LAUFFELD" or figur.status == "ZIEL":
             neue_schritte = figur.schritte + self.wuerfel.wert
@@ -161,7 +185,6 @@ class Spiel:
                 
                 # Prüfen, ob das Feld im Häuschen schon besetzt ist
                 feld_frei = True
-                aktueller_spieler = self.get_aktueller_spieler()
                 for f in aktueller_spieler.figuren:
                     if f.status == "ZIEL" and f.ziel_position == haus_index:
                         feld_frei = False
