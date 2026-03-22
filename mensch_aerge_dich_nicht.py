@@ -73,7 +73,7 @@ class Spielfigur:
         self.start_x = START_FELDER[farbe][id][0]
         self.start_y = START_FELDER[farbe][id][1]
         
-        # NEU: Gedächtnis für das Ziel
+        # Gedächtnis für das Ziel
         self.schritte = 0 
         self.ziel_position = -1 # Index 0 bis 3 im Häuschen
         
@@ -84,7 +84,7 @@ class Spielfigur:
         elif self.status == "LAUFFELD":
             px = LAUFFELDER[self.position][0] * CELL_SIZE + OFFSET
             py = LAUFFELDER[self.position][1] * CELL_SIZE + OFFSET
-        elif self.status == "ZIEL": # NEU: Zeichnen im Häuschen
+        elif self.status == "ZIEL": # Zeichnen im Häuschen
             zx, zy = ZIEL_FELDER[self.farbe][self.ziel_position]
             px = zx * CELL_SIZE + OFFSET
             py = zy * CELL_SIZE + OFFSET
@@ -134,7 +134,10 @@ class Spiel:
             figur.schritte = 0 # Schritte auf 0 setzen
             figur.position = START_INDEX[figur.farbe]
             self.gegner_schlagen(figur)
-            self.gewuerfelt = False # Bei einer 6 darf man nochmal!
+            
+            # Bei einer 6 darf man nochmal!
+            self.gewuerfelt = False 
+            self.wuerfe_uebrig = 1  # Anzeige der Versuche für den nächsten Wurf aktualisieren
             
         elif figur.status == "LAUFFELD" or figur.status == "ZIEL":
             neue_schritte = figur.schritte + self.wuerfel.wert
@@ -144,7 +147,13 @@ class Spiel:
                 figur.position = (START_INDEX[figur.farbe] + neue_schritte) % 40
                 figur.schritte = neue_schritte
                 self.gegner_schlagen(figur)
-                self.naechster_spieler()
+                
+                # Überprüfen, ob eine 6 gewürfelt wurde
+                if self.wuerfel.wert == 6:
+                    self.gewuerfelt = False
+                    self.wuerfe_uebrig = 1
+                else:
+                    self.naechster_spieler()
                 
             # Fall 2: Figur geht ins Ziel oder bewegt sich im Ziel
             elif neue_schritte < 44:
@@ -165,10 +174,14 @@ class Spiel:
                     # Siegbedingung prüfen
                     if all(f.status == "ZIEL" for f in aktueller_spieler.figuren):
                         print(f"SPIELER {aktueller_spieler.farbe} HAT GEWONNEN!")
-                        # Hier könnten die Schüler später einen Game-Over-Screen einbauen!
                         
-                    self.naechster_spieler()
-            
+                    # Auch im Häuschen gilt: Bei 6 darf man nochmal!
+                    if self.wuerfel.wert == 6:
+                        self.gewuerfelt = False
+                        self.wuerfe_uebrig = 1
+                    else:
+                        self.naechster_spieler()
+    
     def gegner_schlagen(self, aktive_figur):
         # Prüft alle Figuren aller Spieler
         for s in self.spieler_liste:
@@ -281,7 +294,7 @@ def on_mouse_down(pos):
             elif figur.status == "LAUFFELD":
                 px = LAUFFELDER[figur.position][0] * CELL_SIZE + OFFSET
                 py = LAUFFELDER[figur.position][1] * CELL_SIZE + OFFSET
-            elif figur.status == "ZIEL": # NEU: Anklicken im Ziel
+            elif figur.status == "ZIEL": # Anklicken im Ziel
                 px = ZIEL_FELDER[figur.farbe][figur.ziel_position][0] * CELL_SIZE + OFFSET
                 py = ZIEL_FELDER[figur.farbe][figur.ziel_position][1] * CELL_SIZE + OFFSET
                     
