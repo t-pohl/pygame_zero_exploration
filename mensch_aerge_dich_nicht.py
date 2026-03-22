@@ -34,6 +34,14 @@ START_FELDER = {
     "GRUEN": [(0,9), (1,9), (0,10), (1,10)]
 }
 
+# Koordinaten der 4 Zielfelder (Häuschen) für jede Farbe
+ZIEL_FELDER = {
+    "ROT": [(1,5), (2,5), (3,5), (4,5)],
+    "BLAU": [(5,1), (5,2), (5,3), (5,4)],
+    "GELB": [(9,5), (8,5), (7,5), (6,5)],
+    "GRUEN": [(5,9), (5,8), (5,7), (5,6)]
+}
+
 # Einstiegspunkte auf dem Lauffeld (Index in der LAUFFELDER Liste)
 START_INDEX = {"ROT": 0, "BLAU": 10, "GELB": 20, "GRUEN": 30}
 
@@ -60,10 +68,14 @@ class Spielfigur:
     def __init__(self, farbe, id):
         self.farbe = farbe
         self.id = id
-        self.status = "START" # Kann "START", "LAUFFELD" (oder später "ZIEL") sein
-        self.position = -1 # Index auf dem Lauffeld (0-39)
+        self.status = "START" # "START", "LAUFFELD", "ZIEL"
+        self.position = -1 
         self.start_x = START_FELDER[farbe][id][0]
         self.start_y = START_FELDER[farbe][id][1]
+        
+        # NEU: Gedächtnis für das Ziel
+        self.schritte = 0 
+        self.ziel_position = -1 # Index 0 bis 3 im Häuschen
         
     def zeichnen(self):
         if self.status == "START":
@@ -72,6 +84,10 @@ class Spielfigur:
         elif self.status == "LAUFFELD":
             px = LAUFFELDER[self.position][0] * CELL_SIZE + OFFSET
             py = LAUFFELDER[self.position][1] * CELL_SIZE + OFFSET
+        elif self.status == "ZIEL": # NEU: Zeichnen im Häuschen
+            zx, zy = ZIEL_FELDER[self.farbe][self.ziel_position]
+            px = zx * CELL_SIZE + OFFSET
+            py = zy * CELL_SIZE + OFFSET
             
         screen.draw.filled_circle((px, py), 15, FARBEN[self.farbe])
         screen.draw.circle((px, py), 15, FARBEN["SCHWARZ"])
@@ -123,29 +139,45 @@ class Spiel:
         return False
         
     def figur_bewegen(self, figur):
-        if not self.gewuerfelt:
-            return # Man muss erst würfeln!
-
-        # Fall 1: Figur ist im Start und wir haben eine 6
-        if figur.status == "START":
-            if self.wuerfel.wert == 6:
-                figur.status = "LAUFFELD"
-                figur.position = START_INDEX[figur.farbe]
-                self.gegner_schlagen(figur)
-                self.gewuerfelt = False # Nach dem Bewegen darf man bei einer 6 nochmal (hier vereinfacht: Zug vorbei)
-                # TODO für Schüler: Bei einer 6 darf man nochmal würfeln!
-            else:
-                return # Ohne 6 darf man nicht raus
-                
-        # Fall 2: Figur ist auf dem Feld
-        elif figur.status == "LAUFFELD":
-            alte_position = figur.position
-            neue_position = (figur.position + self.wuerfel.wert) % 40
-            # TODO für Schüler: Überprüfen, ob die Figur im Ziel ankommt (Häuschen)
-            
-            figur.position = neue_position
+        if figur.status == "START" and self.wuerfel.wert == 6:
+            figur.status = "LAUFFELD"
+            figur.schritte = 0 # Schritte auf 0 setzen
+            figur.position = START_INDEX[figur.farbe]
             self.gegner_schlagen(figur)
-            self.naechster_spieler()
+            self.gewuerfelt = False # Bei einer 6 darf man nochmal!
+            
+        elif figur.status == "LAUFFELD" or figur.status == "ZIEL":
+            neue_schritte = figur.schritte + self.wuerfel.wert
+            
+            # Fall 1: Figur ist noch auf dem Lauffeld
+            if neue_schritte < 40:
+                figur.position = (START_INDEX[figur.farbe] + neue_schritte) % 40
+                figur.schritte = neue_schritte
+                self.gegner_schlagen(figur)
+                self.naechster_spieler()
+                
+            # Fall 2: Figur geht ins Ziel oder bewegt sich im Ziel
+            elif neue_schritte < 44:
+                haus_index = neue_schritte - 40 # Wird zu 0, 1, 2 oder 3
+                
+                # Prüfen, ob das Feld im Häuschen schon besetzt ist
+                feld_frei = True
+                aktueller_spieler = self.get_aktueller_spieler()
+                for f in aktueller_spieler.figuren:
+                    if f.status == "ZIEL" and f.ziel_position == haus_index:
+                        feld_frei = False
+                        
+                if feld_frei:
+                    figur.status = "ZIEL"
+                    figur.ziel_position = haus_index
+                    figur.schritte = neue_schritte
+                    
+                    # Siegbedingung prüfen
+                    if all(f.status == "ZIEL" for f in aktueller_spieler.figuren):
+                        print(f"SPIELER {aktueller_spieler.farbe} HAT GEWONNEN!")
+                        # Hier könnten die Schüler später einen Game-Over-Screen einbauen!
+                        
+                    self.naechster_spieler()
             
     def gegner_schlagen(self, aktive_figur):
         # Prüft alle Figuren aller Spieler
@@ -157,17 +189,19 @@ class Spiel:
                         f.status = "START" # Gegner wird zurück auf den Start geschickt!
     
     def zug_moeglich(self):
-        # Prüft, ob mit dem aktuellen Würfelwurf ein Zug machbar ist
         aktueller_spieler = self.get_aktueller_spieler()
         for figur in aktueller_spieler.figuren:
-            # Wenn eine Figur schon auf dem Feld ist, kann sie immer ziehen
-            if figur.status == "LAUFFELD":
-                return True
-            # Wenn eine Figur im Start ist, darf sie nur bei einer 6 ziehen
             if figur.status == "START" and self.wuerfel.wert == 6:
                 return True
-        
-        # Wenn keine Bedingung zutrifft, ist kein Zug möglich
+            if figur.status == "LAUFFELD" or figur.status == "ZIEL":
+                neue_schritte = figur.schritte + self.wuerfel.wert
+                if neue_schritte < 40:
+                    return True # Zug auf dem Lauffeld
+                elif neue_schritte < 44:
+                    haus_index = neue_schritte - 40
+                    # Prüfen, ob das Zielfeld frei ist
+                    if not any(f.status == "ZIEL" and f.ziel_position == haus_index for f in aktueller_spieler.figuren):
+                        return True
         return False
 
 
@@ -192,6 +226,15 @@ def draw():
         py = fy * CELL_SIZE + OFFSET
         screen.draw.circle((px, py), 20, FARBEN["SCHWARZ"])
         screen.draw.filled_circle((px, py), 18, FARBEN["WEISS"])
+    
+    # Zeichne Zielfelder (Häuschen) in der jeweiligen Spielerfarbe
+    for farbe, felder in ZIEL_FELDER.items():
+        for fx, fy in felder:
+            px = fx * CELL_SIZE + OFFSET
+            py = fy * CELL_SIZE + OFFSET
+            # Farbig umrandet, innen weiß, damit man die Felder gut erkennt
+            screen.draw.circle((px, py), 20, FARBEN[farbe])
+            screen.draw.filled_circle((px, py), 18, FARBEN["WEISS"])
         
     # Zeichne Würfel
     mein_spiel.wuerfel.zeichnen()
@@ -248,7 +291,10 @@ def on_mouse_down(pos):
             elif figur.status == "LAUFFELD":
                 px = LAUFFELDER[figur.position][0] * CELL_SIZE + OFFSET
                 py = LAUFFELDER[figur.position][1] * CELL_SIZE + OFFSET
-                
+            elif figur.status == "ZIEL": # NEU: Anklicken im Ziel
+                px = ZIEL_FELDER[figur.farbe][figur.ziel_position][0] * CELL_SIZE + OFFSET
+                py = ZIEL_FELDER[figur.farbe][figur.ziel_position][1] * CELL_SIZE + OFFSET
+                    
             dist = math.hypot(pos[0] - px, pos[1] - py)
             if dist < 15: 
                 clock.unschedule(mein_spiel.naechster_spieler)
