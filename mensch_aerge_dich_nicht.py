@@ -110,11 +110,11 @@ class Spiel:
     def get_aktueller_spieler(self):
         return self.spieler_liste[self.aktueller_spieler_idx]
         
-    def alle_figuren_im_start(self):
+    def keine_figur_auf_dem_brett(self):
         # Prüft, ob der aktuelle Spieler alle Figuren im Haus hat
         aktueller_spieler = self.get_aktueller_spieler()
         for figur in aktueller_spieler.figuren:
-            if figur.status != "START":
+            if figur.status == "LAUFFELD":
                 return False
         return True
         
@@ -123,7 +123,7 @@ class Spiel:
         self.gewuerfelt = False
         
         # Überprüfen, wie oft der neue Spieler würfeln darf
-        if self.alle_figuren_im_start():
+        if self.keine_figur_auf_dem_brett():
             self.wuerfe_uebrig = 3
         else:
             self.wuerfe_uebrig = 1
